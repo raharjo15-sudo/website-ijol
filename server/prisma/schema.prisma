@@ -1,0 +1,93 @@
+datasource db {
+  provider = "postgresql" // atau "mysql" / "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  location     String?
+  ratingAvg    Float         @default(0.0) @map("rating_avg")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  items        Item[]
+  sentOffers   BarterOffer[] @relation("SenderOffers")
+  recvOffers   BarterOffer[] @relation("ReceiverOffers")
+  chats        Chat[]
+  reviewsGiven Review[]      @relation("Reviewer")
+  reviewsRecv  Review[]      @relation("ReviewedUser")
+
+  @@map("users")
+}
+
+model Item {
+  id                    Int           @id @default(autoincrement())
+  userId                Int           @map("user_id")
+  title                 String
+  description           String        @db.Text
+  estimatedValue        Decimal?      @map("estimated_value") @db.Decimal(12, 2)
+  desiredItemDescription String?      @map("desired_item_description") @db.Text
+  category              String
+  status                String        @default("available") // 'available', 'bartered', 'draft'
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offeredIn             BarterOffer[] @relation("OfferedItem")
+  targetIn              BarterOffer[] @relation("TargetItem")
+
+  @@map("items")
+}
+
+model BarterOffer {
+  id            Int      @id @default(autoincrement())
+  senderId      Int      @map("sender_id")
+  receiverId    Int      @map("receiver_id")
+  offeredItemId Int      @map("offered_item_id")
+  targetItemId  Int      @map("target_item_id")
+  status        String   @default("pending") // 'pending', 'accepted', 'rejected', 'completed'
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  sender        User     @relation("SenderOffers", fields: [senderId], references: [id])
+  receiver      User     @relation("ReceiverOffers", fields: [receiverId], references: [id])
+  offeredItem   Item     @relation("OfferedItem", fields: [offeredItemId], references: [id])
+  targetItem    Item     @relation("TargetItem", fields: [targetItemId], references: [id])
+  chats         Chat[]
+  reviews       Review[]
+
+  @@map("barter_offers")
+}
+
+model Chat {
+  id            Int         @id @default(autoincrement())
+  barterOfferId Int         @map("barter_offer_id")
+  senderId      Int         @map("sender_id")
+  message       String      @db.Text
+  sentAt        DateTime    @default(now()) @map("sent_at")
+
+  barterOffer   BarterOffer @relation(fields: [barterOfferId], references: [id], onDelete: Cascade)
+  sender        User        @relation(fields: [senderId], references: [id])
+
+  @@map("chats")
+}
+
+model Review {
+  id             Int         @id @default(autoincrement())
+  barterOfferId  Int         @map("barter_offer_id")
+  reviewerId     Int         @map("reviewer_id")
+  reviewedUserId Int         @map("reviewed_user_id")
+  rating         Int
+  comment        String?     @db.Text
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  barterOffer    BarterOffer @relation(fields: [barterOfferId], references: [id])
+  reviewer       User        @relation("Reviewer", fields: [reviewerId], references: [id])
+  reviewedUser   User        @relation("ReviewedUser", fields: [reviewedUserId], references: [id])
+
+  @@map("reviews")
+}
